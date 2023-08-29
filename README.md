@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # ADC Single Read Example
 
 (See the README.md file in the upper level 'examples' directory for more information about examples.)
@@ -53,3 +54,9 @@ If following warning is printed out, it means the calibration required eFuse bit
 W (300) ADC SINGLE: eFuse not burnt, skip calibration
 I (1310) ADC2_CH0: raw  data: 2715
 ```
+=======
+# smartRelay
+Device for controlling electrical equipment connection to ~230V
+
+
+>>>>>>> e3e4fa79b9b4146800d3395285ba44cbb0870e43
