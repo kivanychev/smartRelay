@@ -26,10 +26,10 @@
 #include "esp_adc_cal.h"
 #include "esp_system.h"
 
-
-
 #include "lvgl.h"
 #include "lvgl_helpers.h"
+
+#include "wifi.h"
 
 
 #define LV_TICK_PERIOD_MS 1
@@ -60,6 +60,7 @@ static esp_adc_cal_characteristics_t adc1_chars;
 static esp_adc_cal_characteristics_t adc2_chars;
 static uint16_t current_value = 0;
 static lv_obj_t * table;
+static lv_obj_t * wifi_label;
 
 /**********************
  *  STATIC PROTOTYPES
@@ -182,6 +183,15 @@ static void create_demo_application(void)
     label = lv_label_create(btn2, NULL);
     lv_label_set_text(label, "Toggled");
 
+
+    // LABEL FOR WIFI
+
+    wifi_label = lv_label_create(lv_scr_act(), NULL);
+    lv_label_set_align(wifi_label, LV_ALIGN_CENTER);       /*Center aligned lines*/
+    lv_label_set_text(wifi_label, wifi_get_ip() );
+    lv_obj_set_width(wifi_label, 150);
+    lv_obj_align(wifi_label, NULL, LV_ALIGN_IN_BOTTOM_MID, 0, 0);
+
 }
 
 
@@ -278,6 +288,8 @@ static void guiTask(void *pvParameter)
         sprintf(str, "%d", voltage);
         lv_table_set_cell_value(table, 1, 1, str);
 
+        /* Check Wifi connection */
+        lv_label_set_text(wifi_label, wifi_get_ip() );
     }
 
     /* A task should NEVER return */
@@ -303,6 +315,9 @@ void app_main(void)
      * Otherwise there can be problem such as memory corruption and so on.
      * NOTE: When not using Wi-Fi nor Bluetooth you can pin the guiTask to core 0 */
     xTaskCreatePinnedToCore(guiTask, "gui", 4096*2, NULL, 0, NULL, 1);
+
+    wifi_start();
+
 }
 
 
