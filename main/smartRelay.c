@@ -19,6 +19,7 @@
 #include "freertos/task.h"
 #include "esp_freertos_hooks.h"
 #include "freertos/semphr.h"
+#include "freertos/queue.h"
 
 #include "driver/adc.h"
 #include "driver/gpio.h"
@@ -26,12 +27,18 @@
 #include "esp_adc_cal.h"
 #include "esp_system.h"
 
+#include "nvs_flash.h"
+#include "mqtt_client.h"
+
+
 #include "lvgl.h"
 #include "lvgl_helpers.h"
-
 #include "wifi.h"
 
+#define LAMP_OFF    0
+#define LAMP_ON     1
 
+#define LED4_GPIO   27
 #define LV_TICK_PERIOD_MS 1
 
 //ADC Channels
@@ -47,7 +54,8 @@ static const char *TAG_CH[2][10] = {{"ADC1_CH6"}, {"ADC2_CH0"}};
 
 
 static int adc_raw[2][10];
-static const char *TAG = "ADC SINGLE";
+static const char *TAG = "SMART RELAY";
+static int lamp3_state = LAMP_OFF;
 
 
 /* Creates a semaphore to handle concurrent call to lvgl stuff
@@ -72,8 +80,108 @@ static void create_demo_application(void);
 
 
 /**********************
- *   APPLICATION MAIN
+ *   MQTT - WQTT
  **********************/
+
+static void log_error_if_nonzero(const char *message, int error_code)
+{
+    if (error_code != 0) {
+        ESP_LOGE(TAG, "Last error %s: 0x%x", message, error_code);
+    }
+}
+
+/*
+ * @brief Event handler registered to receive MQTT events
+ *
+ *  This function is called by the MQTT client event loop.
+ *
+ * @param handler_args user data registered to the event.
+ * @param base Event base for the handler(always MQTT Base in this example).
+ * @param event_id The id for the received event.
+ * @param event_data The data for the event, esp_mqtt_event_handle_t.
+ */
+static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_t event_id, void *event_data)
+{
+    ESP_LOGD(TAG, "Event dispatched from event loop base=%s, event_id=%d", base, event_id);
+    esp_mqtt_event_handle_t event = event_data;
+    esp_mqtt_client_handle_t client = event->client;
+    int msg_id;
+
+    switch ((esp_mqtt_event_id_t)event_id) {
+    case MQTT_EVENT_CONNECTED:
+        ESP_LOGI(TAG, "MQTT_EVENT_CONNECTED");
+
+
+        msg_id = esp_mqtt_client_subscribe(client, "Lamp3", 0);
+        ESP_LOGI(TAG, "sent subscribe successful, msg_id=%d", msg_id);
+        break;
+
+    case MQTT_EVENT_DISCONNECTED:
+        ESP_LOGI(TAG, "MQTT_EVENT_DISCONNECTED");
+        break;
+
+    case MQTT_EVENT_SUBSCRIBED:
+        ESP_LOGI(TAG, "MQTT_EVENT_SUBSCRIBED, msg_id=%d", event->msg_id);
+
+        break;
+    case MQTT_EVENT_UNSUBSCRIBED:
+        ESP_LOGI(TAG, "MQTT_EVENT_UNSUBSCRIBED, msg_id=%d", event->msg_id);
+        break;
+    case MQTT_EVENT_PUBLISHED:
+        ESP_LOGI(TAG, "MQTT_EVENT_PUBLISHED, msg_id=%d", event->msg_id);
+        break;
+    case MQTT_EVENT_DATA:
+        ESP_LOGI(TAG, "MQTT_EVENT_DATA");
+        printf("TOPIC=%.*s\r\n", event->topic_len, event->topic);
+        printf("DATA=%.*s\r\n", event->data_len, event->data);
+
+        if(event->data[0] == '1')
+        {
+            gpio_set_level(LED4_GPIO, 0);
+            lamp3_state = LAMP_ON;
+        } else if (event->data[0] == '0')
+        {
+            gpio_set_level(LED4_GPIO, 1);
+            lamp3_state = LAMP_OFF;
+        }
+
+        break;
+    case MQTT_EVENT_ERROR:
+        ESP_LOGI(TAG, "MQTT_EVENT_ERROR");
+        if (event->error_handle->error_type == MQTT_ERROR_TYPE_TCP_TRANSPORT) {
+            log_error_if_nonzero("reported from esp-tls", event->error_handle->esp_tls_last_esp_err);
+            log_error_if_nonzero("reported from tls stack", event->error_handle->esp_tls_stack_err);
+            log_error_if_nonzero("captured as transport's socket errno",  event->error_handle->esp_transport_sock_errno);
+            ESP_LOGI(TAG, "Last errno string (%s)", strerror(event->error_handle->esp_transport_sock_errno));
+
+        }
+        break;
+    default:
+        ESP_LOGI(TAG, "Other event id:%d", event->event_id);
+        break;
+    }
+}
+
+static void mqtt_app_start(void)
+{
+    esp_mqtt_client_config_t mqtt_cfg = {
+        .uri = "mqtt://m3.wqtt.ru",
+        .username = "u_BFZH1K",
+        .password = "3vGW4o04",
+        .port = 8817
+    };
+
+
+    esp_mqtt_client_handle_t client = esp_mqtt_client_init(&mqtt_cfg);
+    /* The last argument may be used to pass data to the event handler, in this example mqtt_event_handler */
+    esp_mqtt_client_register_event(client, ESP_EVENT_ANY_ID, mqtt_event_handler, NULL);
+    esp_mqtt_client_start(client);
+}
+
+/**********************
+ *   ADC
+ **********************/
+
 
 
 static bool adc_calibration_init(void)
@@ -96,6 +204,10 @@ static bool adc_calibration_init(void)
 
     return cali_enable;
 }
+
+/**********************
+ *   LVGL FUNCTIONS
+ **********************/
 
 
 static void btn_event_handler(lv_obj_t * obj, lv_event_t event)
@@ -135,11 +247,8 @@ static void create_demo_application(void)
     lv_table_set_row_cnt(table, 3);
     lv_obj_align(table, NULL, LV_ALIGN_IN_TOP_MID, 0, 0);
 
-    /*Make the cells of the first row center aligned */
-    lv_table_set_cell_align(table, 0, 0, LV_LABEL_ALIGN_CENTER);
-    lv_table_set_cell_align(table, 0, 1, LV_LABEL_ALIGN_CENTER);
-
     /*Align the price values to the right in the 2nd column*/
+    lv_table_set_cell_align(table, 0, 1, LV_LABEL_ALIGN_RIGHT);
     lv_table_set_cell_align(table, 1, 1, LV_LABEL_ALIGN_RIGHT);
     lv_table_set_cell_align(table, 2, 1, LV_LABEL_ALIGN_RIGHT);
 
@@ -148,12 +257,12 @@ static void create_demo_application(void)
 
 
     /*Fill the first column*/
-    lv_table_set_cell_value(table, 0, 0, "Name");
+    lv_table_set_cell_value(table, 0, 0, "Light");
     lv_table_set_cell_value(table, 1, 0, "Current");
     lv_table_set_cell_value(table, 2, 0, "Fan state");
 
     /*Fill the second column*/
-    lv_table_set_cell_value(table, 0, 1, "Value");
+    lv_table_set_cell_value(table, 0, 1, "OFF");
     lv_table_set_cell_value(table, 1, 1, "1A");
     lv_table_set_cell_value(table, 2, 1, "OFF");
 
@@ -171,7 +280,7 @@ static void create_demo_application(void)
     lv_obj_align(btn1, NULL, LV_ALIGN_CENTER, 0, 30);
 
     label = lv_label_create(btn1, NULL);
-    lv_label_set_text(label, "Button");
+    lv_label_set_text(label, "Light off");
 
     lv_obj_t * btn2 = lv_btn_create(lv_scr_act(), NULL);
     lv_obj_set_event_cb(btn2, btn_event_handler);
@@ -181,16 +290,15 @@ static void create_demo_application(void)
     lv_btn_set_fit2(btn2, LV_FIT_NONE, LV_FIT_TIGHT);
 
     label = lv_label_create(btn2, NULL);
-    lv_label_set_text(label, "Toggled");
+    lv_label_set_text(label, "Light on");
 
 
     // LABEL FOR WIFI
 
     wifi_label = lv_label_create(lv_scr_act(), NULL);
-    lv_label_set_align(wifi_label, LV_ALIGN_CENTER);       /*Center aligned lines*/
+    lv_label_set_align(wifi_label, LV_ALIGN_IN_TOP_LEFT);       /*Center aligned lines*/
     lv_label_set_text(wifi_label, wifi_get_ip() );
     lv_obj_set_width(wifi_label, 150);
-    lv_obj_align(wifi_label, NULL, LV_ALIGN_IN_BOTTOM_MID, 0, 0);
 
 }
 
@@ -290,6 +398,16 @@ static void guiTask(void *pvParameter)
 
         /* Check Wifi connection */
         lv_label_set_text(wifi_label, wifi_get_ip() );
+
+
+        // Lamp3 state display
+        if(lamp3_state == LAMP_OFF )
+        {
+            lv_table_set_cell_value(table, 0, 1, "OFF");
+        } else {
+            lv_table_set_cell_value(table, 0, 1, "ON");
+        }
+
     }
 
     /* A task should NEVER return */
@@ -304,13 +422,13 @@ static void guiTask(void *pvParameter)
 
 
 
-
-
+/**********************
+ *   APPLICATION MAIN
+ **********************/
 
 
 void app_main(void)
 {
-
     /* If you want to use a task to create the graphic, you NEED to create a Pinned task
      * Otherwise there can be problem such as memory corruption and so on.
      * NOTE: When not using Wi-Fi nor Bluetooth you can pin the guiTask to core 0 */
@@ -318,6 +436,31 @@ void app_main(void)
 
     wifi_start();
 
+    esp_log_level_set("*", ESP_LOG_INFO);
+    esp_log_level_set("MQTT_CLIENT", ESP_LOG_VERBOSE);
+    esp_log_level_set("MQTT_EXAMPLE", ESP_LOG_VERBOSE);
+    esp_log_level_set("TRANSPORT_BASE", ESP_LOG_VERBOSE);
+    esp_log_level_set("esp-tls", ESP_LOG_VERBOSE);
+    esp_log_level_set("TRANSPORT", ESP_LOG_VERBOSE);
+    esp_log_level_set("OUTBOX", ESP_LOG_VERBOSE);
+
+    // Configure LED4 pin for output
+    gpio_reset_pin(LED4_GPIO);
+    /* Set the GPIO as a push/pull output */
+    gpio_set_direction(LED4_GPIO, GPIO_MODE_OUTPUT);
+    // OFF the light
+    gpio_set_level(LED4_GPIO, 1);
+
+    ESP_LOGI(TAG, "Connecting to WiFi..");
+
+    while( wifi_get_ip()[0] == 'N')
+    {
+        vTaskDelay(pdMS_TO_TICKS(10));        
+    }
+
+    ESP_LOGI(TAG, "IP address=%s", wifi_get_ip() );
+
+    mqtt_app_start();
 }
 
 

@@ -1225,16 +1225,6 @@ CONFIG_WPA_MBEDTLS_CRYPTO=y
 # end of Supplicant
 
 #
-# lv_examples configuration
-#
-# CONFIG_LV_EX_PRINTF is not set
-# CONFIG_LV_USE_DEMO_WIDGETS is not set
-# CONFIG_LV_USE_DEMO_KEYPAD_AND_ENCODER is not set
-CONFIG_LV_USE_DEMO_BENCHMARK=y
-# CONFIG_LV_USE_DEMO_STRESS is not set
-# end of lv_examples configuration
-
-#
 # LVGL configuration
 #
 # CONFIG_LV_ATTRIBUTE_FAST_MEM_USE_IRAM is not set
