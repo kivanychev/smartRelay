@@ -1,17 +1,8 @@
 /*
- * SPDX-FileCopyrightText: 2021 Espressif Systems (Shanghai) CO LTD
- *
- * SPDX-License-Identifier: Apache-2.0
+ * 
  */
 
-/* ADC1 Example
 
-   This example code is in the Public Domain (or CC0 licensed, at your option.)
-
-   Unless required by applicable law or agreed to in writing, this
-   software is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
-   CONDITIONS OF ANY KIND, either express or implied.
-*/
 #include <stdio.h>
 #include <stdlib.h>
 #include "esp_log.h"
@@ -21,10 +12,7 @@
 #include "freertos/semphr.h"
 #include "freertos/queue.h"
 
-#include "driver/adc.h"
 #include "driver/gpio.h"
-
-#include "esp_adc_cal.h"
 #include "esp_system.h"
 
 #include "nvs_flash.h"
@@ -34,6 +22,7 @@
 #include "lvgl.h"
 #include "lvgl_helpers.h"
 #include "wifi.h"
+#include "hw_ctrl.h"
 
 #define LAMP_OFF    0
 #define LAMP_ON     1
@@ -41,31 +30,15 @@
 #define LED4_GPIO   27
 #define LV_TICK_PERIOD_MS 1
 
-//ADC Channels
-#define ADC1_EXAMPLE_CHAN0          ADC1_CHANNEL_6
-#define ADC2_EXAMPLE_CHAN0          ADC2_CHANNEL_0
-static const char *TAG_CH[2][10] = {{"ADC1_CH6"}, {"ADC2_CH0"}};
 
-//ADC Attenuation
-#define ADC_EXAMPLE_ATTEN           ADC_ATTEN_DB_11
-
-//ADC Calibration
-#define ADC_EXAMPLE_CALI_SCHEME     ESP_ADC_CAL_VAL_EFUSE_VREF
-
-
-static int adc_raw[2][10];
 static const char *TAG = "SMART RELAY";
 static int lamp3_state = LAMP_OFF;
-
 
 /* Creates a semaphore to handle concurrent call to lvgl stuff
  * If you wish to call *any* lvgl function from other threads/tasks
  * you should lock on the very same semaphore! */
 SemaphoreHandle_t xGuiSemaphore;
 
-
-static esp_adc_cal_characteristics_t adc1_chars;
-static esp_adc_cal_characteristics_t adc2_chars;
 static uint16_t current_value = 0;
 static lv_obj_t * table;
 static lv_obj_t * wifi_label;
@@ -79,7 +52,7 @@ static void guiTask(void *pvParameter);
 static void create_demo_application(void);
 
 static void update_current_value(void *arg);
-static uint32_t voltage = 0;
+static uint32_t current = 0;
 
 /**********************
  *   MQTT - WQTT
@@ -193,32 +166,6 @@ static void mqtt_app_start(void)
 
 }
 
-/**********************
- *   ADC
- **********************/
-
-
-
-static bool adc_calibration_init(void)
-{
-    esp_err_t ret;
-    bool cali_enable = false;
-
-    ret = esp_adc_cal_check_efuse(ADC_EXAMPLE_CALI_SCHEME);
-    if (ret == ESP_ERR_NOT_SUPPORTED) {
-        ESP_LOGW(TAG, "Calibration scheme not supported, skip software calibration");
-    } else if (ret == ESP_ERR_INVALID_VERSION) {
-        ESP_LOGW(TAG, "eFuse not burnt, skip software calibration");
-    } else if (ret == ESP_OK) {
-        cali_enable = true;
-        esp_adc_cal_characterize(ADC_UNIT_1, ADC_EXAMPLE_ATTEN, ADC_WIDTH_BIT_DEFAULT, 0, &adc1_chars);
-//        esp_adc_cal_characterize(ADC_UNIT_2, ADC_EXAMPLE_ATTEN, ADC_WIDTH_BIT_DEFAULT, 0, &adc2_chars);
-    } else {
-        ESP_LOGE(TAG, "Invalid arg");
-    }
-
-    return cali_enable;
-}
 
 /**********************
  *   LVGL FUNCTIONS
@@ -323,13 +270,6 @@ static void guiTask(void *pvParameter)
 {
     char str[32];
     esp_err_t ret = ESP_OK;
-    bool cali_enable = adc_calibration_init();
-
-    //ADC1 config
-    ESP_ERROR_CHECK(adc1_config_width(ADC_WIDTH_BIT_DEFAULT));
-    ESP_ERROR_CHECK(adc1_config_channel_atten(ADC1_EXAMPLE_CHAN0, ADC_EXAMPLE_ATTEN));
-
-
 
     (void) pvParameter;
     xGuiSemaphore = xSemaphoreCreateMutex();
@@ -341,7 +281,6 @@ static void guiTask(void *pvParameter)
 
     lv_color_t* buf1 = heap_caps_malloc(DISP_BUF_SIZE * sizeof(lv_color_t), MALLOC_CAP_DMA);
     assert(buf1 != NULL);
-
 
     lv_color_t* buf2 = heap_caps_malloc(DISP_BUF_SIZE * sizeof(lv_color_t), MALLOC_CAP_DMA);
     assert(buf2 != NULL);
@@ -395,24 +334,13 @@ static void guiTask(void *pvParameter)
             xSemaphoreGive(xGuiSemaphore);
        }
 
-
-
-        /* ADC actions */
-
-        adc_raw[0][0] = adc1_get_raw(ADC1_EXAMPLE_CHAN0);
-        ESP_LOGI(TAG_CH[0][0], "raw  data: %d", adc_raw[0][0]);
-        //if (cali_enable) 
-        {
-            voltage = esp_adc_cal_raw_to_voltage(adc_raw[0][0], &adc1_chars);
-            ESP_LOGI(TAG_CH[0][0], "cali data: %d mV", voltage);
-        }
-
-        sprintf(str, "%d", voltage);
+        // Update Current value on the screen
+        current = hw_ctrl_get_Current();
+        sprintf(str, "%d", current);
         lv_table_set_cell_value(table, 1, 1, str);
 
-        /* Check Wifi connection */
+        /* Update Wifi connection IP address */
         lv_label_set_text(wifi_label, wifi_get_ip() );
-
 
         // Lamp3 state display
         if(lamp3_state == LAMP_OFF )
@@ -431,8 +359,6 @@ static void guiTask(void *pvParameter)
 #endif
     vTaskDelete(NULL);
 }
-
-
 
 
 
@@ -474,12 +400,18 @@ void app_main(void)
 
     ESP_LOGI(TAG, "IP address=%s", wifi_get_ip() );
 
+    hw_ctrl_start();
+
     mqtt_app_start();
 }
 
 
 
-
+/**
+ * @brief Calls lv_tick_inc() periodically for getting LVGL to work
+ * 
+ * @param arg Arguments
+ */
 static void lv_tick_task(void *arg) {
     (void) arg;
 
@@ -487,12 +419,17 @@ static void lv_tick_task(void *arg) {
 }
 
 
+/**
+ * @brief Updates the value of Current on the TFT diaplay
+ * 
+ * @param arg Arguments
+ */
 static void update_current_value(void *arg)
 {
     int msg_id;
     char str[32];
 
-    sprintf( str, "%d", voltage );
+    sprintf( str, "%d", current );
 
     msg_id = esp_mqtt_client_publish(client, "Current", str, 0, 1, 0);
     ESP_LOGI(TAG, "sent publish successful, msg_id=%d", msg_id);
