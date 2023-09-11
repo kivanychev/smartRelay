@@ -78,10 +78,14 @@ static void lv_tick_task(void *arg);
 static void guiTask(void *pvParameter);
 static void create_demo_application(void);
 
+static void update_current_value(void *arg);
+static uint32_t voltage = 0;
 
 /**********************
  *   MQTT - WQTT
  **********************/
+
+static esp_mqtt_client_handle_t client;
 
 static void log_error_if_nonzero(const char *message, int error_code)
 {
@@ -172,10 +176,21 @@ static void mqtt_app_start(void)
     };
 
 
-    esp_mqtt_client_handle_t client = esp_mqtt_client_init(&mqtt_cfg);
+    client = esp_mqtt_client_init(&mqtt_cfg);
     /* The last argument may be used to pass data to the event handler, in this example mqtt_event_handler */
     esp_mqtt_client_register_event(client, ESP_EVENT_ANY_ID, mqtt_event_handler, NULL);
     esp_mqtt_client_start(client);
+
+    /* Create and start a periodic timer interrupt to call update_current_value */
+    const esp_timer_create_args_t periodic_timer_args = {
+        .callback = &update_current_value,
+        .name = "periodic_current"
+    };
+
+    esp_timer_handle_t periodic_timer;
+    ESP_ERROR_CHECK(esp_timer_create(&periodic_timer_args, &periodic_timer));
+    ESP_ERROR_CHECK(esp_timer_start_periodic(periodic_timer, LV_TICK_PERIOD_MS * 1000000));
+
 }
 
 /**********************
@@ -197,7 +212,7 @@ static bool adc_calibration_init(void)
     } else if (ret == ESP_OK) {
         cali_enable = true;
         esp_adc_cal_characterize(ADC_UNIT_1, ADC_EXAMPLE_ATTEN, ADC_WIDTH_BIT_DEFAULT, 0, &adc1_chars);
-        esp_adc_cal_characterize(ADC_UNIT_2, ADC_EXAMPLE_ATTEN, ADC_WIDTH_BIT_DEFAULT, 0, &adc2_chars);
+//        esp_adc_cal_characterize(ADC_UNIT_2, ADC_EXAMPLE_ATTEN, ADC_WIDTH_BIT_DEFAULT, 0, &adc2_chars);
     } else {
         ESP_LOGE(TAG, "Invalid arg");
     }
@@ -308,7 +323,6 @@ static void guiTask(void *pvParameter)
 {
     char str[32];
     esp_err_t ret = ESP_OK;
-    uint32_t voltage = 0;
     bool cali_enable = adc_calibration_init();
 
     //ADC1 config
@@ -470,4 +484,16 @@ static void lv_tick_task(void *arg) {
     (void) arg;
 
     lv_tick_inc(LV_TICK_PERIOD_MS);
+}
+
+
+static void update_current_value(void *arg)
+{
+    int msg_id;
+    char str[32];
+
+    sprintf( str, "%d", voltage );
+
+    msg_id = esp_mqtt_client_publish(client, "Current", str, 0, 1, 0);
+    ESP_LOGI(TAG, "sent publish successful, msg_id=%d", msg_id);
 }
