@@ -1,0 +1,12 @@
+{
+    "idf.adapterTargetName": "esp32",
+    "files.associations": {
+        "lv_label.h": "c",
+        "lvgl.h": "c",
+        "lvgl_helpers.h": "c",
+        "esp_wifi.h": "c",
+        "nvs_flash.h": "c"
+    },
+    "idf.portWin": "COM3",
+    "idf.flashType": "UART"
+}
