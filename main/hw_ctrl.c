@@ -129,7 +129,12 @@ void hw_ctrl_start(void)
  */
 void hw_ctrl_set_Load2_level(uint8_t level)
 {
+    if(level > 100)
+    {
+        level = 100;
+    }
 
+    Load2_level = level;
 }
 
 /**
