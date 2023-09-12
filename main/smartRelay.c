@@ -23,7 +23,7 @@
 #include "wifi.h"
 #include "hw_ctrl.h"
 #include "wqtt_client.h"
-
+#include "smartRelay.h"
 
 static const char *TAG = "SMART RELAY";
 
@@ -34,7 +34,6 @@ SemaphoreHandle_t xGuiSemaphore;
 
 static uint16_t current_value = 0;
 static lv_obj_t * table;
-static lv_obj_t * wifi_label;
 
 /********************************************************
  *  STATIC PROTOTYPES
@@ -42,19 +41,27 @@ static lv_obj_t * wifi_label;
 
 static void lv_tick_task(void *arg);
 static void guiTask(void *pvParameter);
-static void create_demo_application(void);
+static void create_controls(void);
 
-static void update_current_value(void *arg);
-static uint32_t current = 0;
+/*******************************************************
+ *  STATIC VARIABLES
+ *******************************************************/
 
+static uint32_t     fan_speed = 1;
+static hw_state_t   light_state = HW_OFF;
+static hw_state_t   heater_state = HW_OFF;
+static uint32_t     current = 0;
+
+// Control objects
+static lv_obj_t*    spinbox;
+static lv_obj_t*    heater_btn;
+static lv_obj_t*    light_btn;
 
 /*******************************************************
  *   LVGL CONTROLS HANDLING
  *******************************************************/
 
 // FAN CONTROLS
-
-static lv_obj_t * spinbox;
 
 static void lv_spinbox_increment_event_cb(lv_obj_t * btn, lv_event_t e)
 {
@@ -71,12 +78,37 @@ static void lv_spinbox_decrement_event_cb(lv_obj_t * btn, lv_event_t e)
 }
 
 
-// LIGHT SWITCH CONTROLS
+// HEATER CONTROL
 
-static void sw_event_handler(lv_obj_t * obj, lv_event_t event)
+static void heater_event_handler(lv_obj_t * obj, lv_event_t event)
+{   
+    if(event == LV_EVENT_PRESSED ) 
+    {
+        if(heater_state == HW_ON)
+        {
+            heater_state = HW_OFF;
+            lv_obj_set_style_local_value_str(obj, LV_BTN_PART_MAIN, LV_STATE_DEFAULT, LV_SYMBOL_EYE_CLOSE);
+        } else {
+            heater_state = HW_ON;
+            lv_obj_set_style_local_value_str(obj, LV_BTN_PART_MAIN, LV_STATE_DEFAULT, LV_SYMBOL_EYE_OPEN);
+        }
+    }
+}
+
+// LIGHT CONTROL
+
+static void light_event_handler(lv_obj_t * obj, lv_event_t event)
 {
-    if(event == LV_EVENT_VALUE_CHANGED) {
-        printf("State: %s\n", lv_switch_get_state(obj) ? "On" : "Off");
+    if(event == LV_EVENT_PRESSED ) 
+    {
+        if(light_state == HW_ON)
+        {
+            light_state = HW_OFF;
+            lv_obj_set_style_local_value_str(obj, LV_BTN_PART_MAIN, LV_STATE_DEFAULT, LV_SYMBOL_EYE_CLOSE);
+        } else {
+            light_state = HW_ON;
+            lv_obj_set_style_local_value_str(obj, LV_BTN_PART_MAIN, LV_STATE_DEFAULT, LV_SYMBOL_EYE_OPEN);
+        }
     }
 }
 
@@ -84,7 +116,7 @@ static void sw_event_handler(lv_obj_t * obj, lv_event_t event)
 /**
  * Create a button with a label and react on click event.
  */
-static void create_demo_application(void)
+static void create_controls(void)
 {
 
     // TABLE OF VALUES
@@ -103,25 +135,24 @@ static void create_demo_application(void)
 
 
     // Fill the first column
-    lv_table_set_cell_value(table, 0, 0, "Light");
+    lv_table_set_cell_value(table, 0, 0, "Wi-Fi");
     lv_table_set_cell_value(table, 1, 0, "Current");
 
     //Fill the second column
-    lv_table_set_cell_value(table, 0, 1, "OFF");
+    lv_table_set_cell_value(table, 0, 1, "Not connected");
     lv_table_set_cell_value(table, 1, 1, "1A");
 
     lv_table_ext_t * ext = lv_obj_get_ext_attr(table);
     ext->row_h[0] = 20;
 
 
-    // FAN REGULATOR
-
+    // FAN SPEED REGULATOR
     spinbox = lv_spinbox_create(lv_scr_act(), NULL);
     lv_spinbox_set_range(spinbox, 1, 5);
     lv_spinbox_set_digit_format(spinbox, 1, 0);
     lv_spinbox_step_prev(spinbox);
     lv_obj_set_width(spinbox, 50);
-    lv_obj_align(spinbox, NULL, LV_ALIGN_CENTER, 0, 0);
+    lv_obj_align(spinbox, NULL, LV_ALIGN_CENTER, 50, 0);
 
     lv_coord_t h = lv_obj_get_height(spinbox);
     lv_obj_t * btn = lv_btn_create(lv_scr_act(), NULL);
@@ -136,12 +167,39 @@ static void create_demo_application(void)
     lv_obj_set_event_cb(btn, lv_spinbox_decrement_event_cb);
     lv_obj_set_style_local_value_str(btn, LV_BTN_PART_MAIN, LV_STATE_DEFAULT, LV_SYMBOL_MINUS);
 
-    // LABEL FOR WIFI
+    // HEATER BUTTON
+    heater_btn =  lv_btn_create(lv_scr_act(), btn);
+    lv_obj_align(heater_btn, spinbox, LV_ALIGN_OUT_RIGHT_MID, 5, 60);
+    lv_obj_set_event_cb(heater_btn, heater_event_handler);
+    lv_obj_set_style_local_value_str(heater_btn, LV_BTN_PART_MAIN, LV_STATE_DEFAULT, LV_SYMBOL_EYE_OPEN);
 
-    wifi_label = lv_label_create(lv_scr_act(), NULL);
-    lv_label_set_align(wifi_label, LV_ALIGN_IN_TOP_LEFT);       /*Center aligned lines*/
-    lv_label_set_text(wifi_label, wifi_get_ip() );
-    lv_obj_set_width(wifi_label, 150);
+    // LIGHT BUTTON
+    light_btn =  lv_btn_create(lv_scr_act(), btn);
+    lv_obj_align(light_btn, spinbox, LV_ALIGN_OUT_RIGHT_MID, 5, 120);
+    lv_obj_set_event_cb(light_btn, light_event_handler);
+    lv_obj_set_style_local_value_str(light_btn, LV_BTN_PART_MAIN, LV_STATE_DEFAULT, LV_SYMBOL_EYE_OPEN);
+
+    // LABEL FOR FAN
+    lv_obj_t* fan_label = lv_label_create(lv_scr_act(), NULL);
+    lv_obj_align(fan_label, NULL, LV_ALIGN_IN_LEFT_MID, 1, 0);
+
+    lv_label_set_text(fan_label, "Fan speed:" );
+    lv_obj_set_width(fan_label, 150);
+
+    // LABEL FOR LIGHT
+    lv_obj_t* light_label = lv_label_create(lv_scr_act(), NULL);
+    lv_obj_align(light_label, NULL, LV_ALIGN_IN_LEFT_MID, 1, 60);
+
+    lv_label_set_text(light_label, "Light state:" );
+    lv_obj_set_width(light_label, 150);
+
+    // LABEL FOR HEATER
+    lv_obj_t* heater_label = lv_label_create(lv_scr_act(), NULL);
+    lv_obj_align(heater_label, NULL, LV_ALIGN_IN_LEFT_MID, 1, 120);
+
+    lv_label_set_text(heater_label, "Heater state:" );
+    lv_obj_set_width(heater_label, 150);
+
 
 }
 
@@ -204,8 +262,8 @@ static void guiTask(void *pvParameter)
     ESP_ERROR_CHECK(esp_timer_create(&periodic_timer_args, &periodic_timer));
     ESP_ERROR_CHECK(esp_timer_start_periodic(periodic_timer, LV_TICK_PERIOD_MS * 1000));
 
-    /* Create the demo application */
-    create_demo_application();
+    create_controls();
+
 
     while (1) {
         /* Delay 1 tick (assumes FreeRTOS tick is 10ms */
@@ -224,14 +282,14 @@ static void guiTask(void *pvParameter)
         lv_table_set_cell_value(table, 1, 1, str);
 
         /* Update Wifi connection IP address */
-        lv_label_set_text(wifi_label, wifi_get_ip() );
+        lv_table_set_cell_value(table, 0, 1, wifi_get_ip() );
 
         // Lamp3 state display
         if(hw_ctrl_get_lamp3_state() == HW_OFF )
         {
-            lv_table_set_cell_value(table, 0, 1, "OFF");
+            //lv_table_set_cell_value(table, 0, 1, "OFF");
         } else {
-            lv_table_set_cell_value(table, 0, 1, "ON");
+            //lv_table_set_cell_value(table, 0, 1, "ON");
         }
 
     }
@@ -278,8 +336,14 @@ void app_main(void)
     ESP_LOGI(TAG, "IP address=%s", wifi_get_ip() );
 
     hw_ctrl_start();
-
     wqtt_client_start();
+
+    // Initiazlize controls
+    smartRelay_set_fan_speed(1);
+    smartRelay_set_current_value(0);
+    smartRelay_set_heater_state(HW_OFF);
+    smartRelay_set_light_state(HW_OFF);
+
 }
 
 
@@ -292,4 +356,52 @@ static void lv_tick_task(void *arg) {
     (void) arg;
 
     lv_tick_inc(LV_TICK_PERIOD_MS);
+}
+
+
+/**********************************************************
+ EXTERNAL FUNCTIONS
+ **********************************************************/
+
+void smartRelay_set_fan_speed(uint8_t new_fan_speed)
+{
+    if(new_fan_speed > 5) {
+        new_fan_speed = 5;
+    }
+
+    lv_spinbox_set_value(spinbox, new_fan_speed);
+}
+
+void smartRelay_set_light_state(hw_state_t new_state)
+{
+    if(new_state == HW_OFF)
+    {
+        light_state = HW_OFF;
+        lv_obj_set_style_local_value_str(light_btn, LV_BTN_PART_MAIN, LV_STATE_DEFAULT, LV_SYMBOL_EYE_CLOSE);
+    } else {
+        light_state = HW_ON;
+        lv_obj_set_style_local_value_str(light_btn, LV_BTN_PART_MAIN, LV_STATE_DEFAULT, LV_SYMBOL_EYE_OPEN);
+    }
+}
+
+void smartRelay_set_heater_state(hw_state_t new_state)
+{
+    if(new_state == HW_OFF)
+    {
+        heater_state = HW_OFF;
+        lv_obj_set_style_local_value_str(heater_btn, LV_BTN_PART_MAIN, LV_STATE_DEFAULT, LV_SYMBOL_EYE_CLOSE);
+    } else {
+        heater_state = HW_ON;
+        lv_obj_set_style_local_value_str(heater_btn, LV_BTN_PART_MAIN, LV_STATE_DEFAULT, LV_SYMBOL_EYE_OPEN);
+    }
+
+}
+
+void smartRelay_set_current_value(uint32_t new_current_value)
+{
+    char str[16];
+
+    current = new_current_value;
+    sprintf(str, "%d", current);
+    lv_table_set_cell_value(table, 1, 1, str);
 }
