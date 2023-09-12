@@ -5,8 +5,11 @@
         "lvgl.h": "c",
         "lvgl_helpers.h": "c",
         "esp_wifi.h": "c",
-        "nvs_flash.h": "c"
+        "nvs_flash.h": "c",
+        "mqtt_client.h": "c",
+        "hw_ctrl.h": "c"
     },
     "idf.portWin": "COM3",
-    "idf.flashType": "UART"
+    "idf.flashType": "UART",
+    "C_Cpp.errorSquiggles": "disabled"
 }

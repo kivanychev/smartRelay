@@ -9,6 +9,8 @@
 #include "freertos/task.h"
 
 #include "hw_ctrl.h"
+#include "wqtt_client.h"
+
 
 /***********************
  CONSTANTS
@@ -26,17 +28,26 @@ static const char *TAG_CH[2][10] = {{"ADC1_CH6"}, {"ADC2_CH0"}};
 //ADC Calibration
 #define ADC_EXAMPLE_CALI_SCHEME     ESP_ADC_CAL_VAL_EFUSE_VREF
 
+/***********************
+ MACROS
+ ***********************/
+
+#define Lamp3ON()       gpio_set_level(LED4_GPIO, 0)
+#define Lamp3OFF()      gpio_set_level(LED4_GPIO, 1)
+
 
 /***********************
  FUNCTION PROTOTYPES
  ***********************/
 
 static bool adc_calibration_init(void);
-
+static void update_current_value(void *arg);
 
 /***********************
  LOCAL VARIABLES
  ***********************/
+
+static hw_state_t lamp3_state = HW_OFF;
 
 static const char *TAG = "HW CTRL";
 
@@ -51,9 +62,11 @@ static hw_state_t   Load1_state = HW_OFF;
 static hw_state_t   Load3_state = HW_OFF;
 static uint32_t     Current = 0;
 
-/***********************
- FUNCTION DEFINITIONS
- ***********************/
+static hw_state_t lamp3_new_state = HW_OFF;
+
+/************************************
+ STATIC FUNCTION DEFINITIONS
+ *************************************/
 
 
 static void hw_ctrl_task(void *pvParameter)
@@ -64,6 +77,23 @@ static void hw_ctrl_task(void *pvParameter)
     //ADC1 config
     ESP_ERROR_CHECK(adc1_config_width(ADC_WIDTH_BIT_DEFAULT));
     ESP_ERROR_CHECK(adc1_config_channel_atten(ADC1_EXAMPLE_CHAN0, ADC_EXAMPLE_ATTEN));
+
+    // Configure LED4 pin for output
+    gpio_reset_pin(LED4_GPIO);
+    /* Set the GPIO as a push/pull output */
+    gpio_set_direction(LED4_GPIO, GPIO_MODE_OUTPUT);
+
+    Lamp3OFF();
+
+    /* Create and start a periodic timer interrupt to call update_current_value() */
+    const esp_timer_create_args_t periodic_timer_args = {
+        .callback = &update_current_value,
+        .name = "periodic_current"
+    };
+
+    esp_timer_handle_t periodic_timer;
+    ESP_ERROR_CHECK(esp_timer_create(&periodic_timer_args, &periodic_timer));
+    ESP_ERROR_CHECK(esp_timer_start_periodic(periodic_timer, LV_TICK_PERIOD_MS * 1000000));
 
 
     while(1)
@@ -82,6 +112,16 @@ static void hw_ctrl_task(void *pvParameter)
     }
 }
 
+
+/**
+ * @brief Updates the value of Current for WQTT cloud
+ * 
+ * @param arg Arguments
+ */
+static void update_current_value(void *arg)
+{
+    wqtt_client_set_current( Current );
+}
 
 
 /**
@@ -111,7 +151,9 @@ static bool adc_calibration_init(void)
     return cali_enable;
 }
 
-
+/****************************************
+ EXTERNAL FUNCTIONS
+*****************************************/
 
 /**
  * The function "hw_ctrl_start" creates a task called "hw_ctrl_task" with a stack size of 4096*2 and a
@@ -187,8 +229,39 @@ hw_state_t hw_ctrl_get_Load3_state(void)
     return Load3_state;
 }
 
-
+/**
+ * @brief Gets a current value in mA
+ * 
+ * @return Current value in mA
+ */
 uint32_t hw_ctrl_get_Current(void)
 {
     return Current;
+}
+
+/**
+ * @brief Sets Lams3 state
+ * 
+ * @param lamp3_new_state: HW_ON, HW_OFF
+ */
+void hw_ctrl_set_lamp3_state(hw_state_t lamp3_new_state)
+{
+    lamp3_state = lamp3_new_state;
+
+    if(lamp3_new_state == HW_ON)
+    {
+        Lamp3ON();
+    } else {
+        Lamp3OFF();
+    }
+}
+
+/**
+ * @brief Get Lamp3 state
+ * 
+ * @return HW_ON, HW_OFF
+ */
+hw_state_t  hw_ctrl_get_lamp3_state(void)
+{
+    return lamp3_state;
 }
