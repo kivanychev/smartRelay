@@ -48,45 +48,35 @@ static void update_current_value(void *arg);
 static uint32_t current = 0;
 
 
-/**********************
- *   LVGL FUNCTIONS
- **********************/
+/*******************************************************
+ *   LVGL CONTROLS HANDLING
+ *******************************************************/
 
+// FAN CONTROLS
 
-/**
- * The function `btn_event_handler` handles events for a button object, printing "Clicked" when the
- * button is clicked and "Toggled" when its value is changed, and updates a table cell with the current
- * value.
- * 
- * @param obj   The `obj` parameter is a pointer to the object that triggered the event. In this case, it
- *              is the button object that the event handler is attached to.
- * @param event The event parameter is of type lv_event_t, which is an enumeration type that represents
- *              different types of events that can occur in the LittlevGL library. In this code snippet, the event
- *              parameter is used to check if the button was clicked or if its value was changed.
- */
-static void btn_event_handler(lv_obj_t * obj, lv_event_t event)
+static lv_obj_t * spinbox;
+
+static void lv_spinbox_increment_event_cb(lv_obj_t * btn, lv_event_t e)
 {
-    char str[32];
-
-    if(event == LV_EVENT_CLICKED) {
-        printf("Clicked\n");
+    if(e == LV_EVENT_PRESSED ) {
+        lv_spinbox_increment(spinbox);
     }
-    else if(event == LV_EVENT_VALUE_CHANGED) {
-        printf("Toggled\n");
+}
+
+static void lv_spinbox_decrement_event_cb(lv_obj_t * btn, lv_event_t e)
+{
+    if(e == LV_EVENT_PRESSED ) {
+        lv_spinbox_decrement(spinbox);
     }
-
-    sprintf(str, "%d", current_value);
-    lv_table_set_cell_value(table, 1, 1, str);
-
-    current_value++;
 }
 
 
+// LIGHT SWITCH CONTROLS
 
-static void event_handler(lv_obj_t * obj, lv_event_t event)
+static void sw_event_handler(lv_obj_t * obj, lv_event_t event)
 {
-    if(event == LV_EVENT_CLICKED) {
-        printf("Clicked: %s\n", lv_list_get_btn_text(obj));
+    if(event == LV_EVENT_VALUE_CHANGED) {
+        printf("State: %s\n", lv_switch_get_state(obj) ? "On" : "Off");
     }
 }
 
@@ -96,56 +86,55 @@ static void event_handler(lv_obj_t * obj, lv_event_t event)
  */
 static void create_demo_application(void)
 {
+
+    // TABLE OF VALUES
+
     table = lv_table_create(lv_scr_act(), NULL);
     lv_table_set_col_cnt(table, 2);
-    lv_table_set_row_cnt(table, 3);
+    lv_table_set_row_cnt(table, 2);
     lv_obj_align(table, NULL, LV_ALIGN_IN_TOP_MID, 0, 0);
 
-    /*Align the price values to the right in the 2nd column*/
+    // Align the price values to the right in the 2nd column
     lv_table_set_cell_align(table, 0, 1, LV_LABEL_ALIGN_RIGHT);
     lv_table_set_cell_align(table, 1, 1, LV_LABEL_ALIGN_RIGHT);
-    lv_table_set_cell_align(table, 2, 1, LV_LABEL_ALIGN_RIGHT);
 
     lv_table_set_cell_type(table, 0, 0, 2);
     lv_table_set_cell_type(table, 0, 1, 2);
 
 
-    /*Fill the first column*/
+    // Fill the first column
     lv_table_set_cell_value(table, 0, 0, "Light");
     lv_table_set_cell_value(table, 1, 0, "Current");
-    lv_table_set_cell_value(table, 2, 0, "Fan state");
 
-    /*Fill the second column*/
+    //Fill the second column
     lv_table_set_cell_value(table, 0, 1, "OFF");
     lv_table_set_cell_value(table, 1, 1, "1A");
-    lv_table_set_cell_value(table, 2, 1, "OFF");
 
     lv_table_ext_t * ext = lv_obj_get_ext_attr(table);
     ext->row_h[0] = 20;
 
 
+    // FAN REGULATOR
 
-    // BUTTONS
+    spinbox = lv_spinbox_create(lv_scr_act(), NULL);
+    lv_spinbox_set_range(spinbox, 1, 5);
+    lv_spinbox_set_digit_format(spinbox, 1, 0);
+    lv_spinbox_step_prev(spinbox);
+    lv_obj_set_width(spinbox, 50);
+    lv_obj_align(spinbox, NULL, LV_ALIGN_CENTER, 0, 0);
 
-    lv_obj_t * label;
+    lv_coord_t h = lv_obj_get_height(spinbox);
+    lv_obj_t * btn = lv_btn_create(lv_scr_act(), NULL);
+    lv_obj_set_size(btn, h, h);
+    lv_obj_align(btn, spinbox, LV_ALIGN_OUT_RIGHT_MID, 5, 0);
+    lv_theme_apply(btn, LV_THEME_SPINBOX_BTN);
+    lv_obj_set_style_local_value_str(btn, LV_BTN_PART_MAIN, LV_STATE_DEFAULT, LV_SYMBOL_PLUS);
+    lv_obj_set_event_cb(btn, lv_spinbox_increment_event_cb);
 
-    lv_obj_t * btn1 = lv_btn_create(lv_scr_act(), NULL);
-    lv_obj_set_event_cb(btn1, btn_event_handler);
-    lv_obj_align(btn1, NULL, LV_ALIGN_CENTER, 0, 30);
-
-    label = lv_label_create(btn1, NULL);
-    lv_label_set_text(label, "Light off");
-
-    lv_obj_t * btn2 = lv_btn_create(lv_scr_act(), NULL);
-    lv_obj_set_event_cb(btn2, btn_event_handler);
-    lv_obj_align(btn2, NULL, LV_ALIGN_CENTER, 0, 90);
-    lv_btn_set_checkable(btn2, true);
-    lv_btn_toggle(btn2);
-    lv_btn_set_fit2(btn2, LV_FIT_NONE, LV_FIT_TIGHT);
-
-    label = lv_label_create(btn2, NULL);
-    lv_label_set_text(label, "Light on");
-
+    btn = lv_btn_create(lv_scr_act(), btn);
+    lv_obj_align(btn, spinbox, LV_ALIGN_OUT_LEFT_MID, -5, 0);
+    lv_obj_set_event_cb(btn, lv_spinbox_decrement_event_cb);
+    lv_obj_set_style_local_value_str(btn, LV_BTN_PART_MAIN, LV_STATE_DEFAULT, LV_SYMBOL_MINUS);
 
     // LABEL FOR WIFI
 
@@ -156,6 +145,9 @@ static void create_demo_application(void)
 
 }
 
+/********************************************
+ GUI TASK
+*********************************************/
 
 
 static void guiTask(void *pvParameter) 
@@ -217,7 +209,7 @@ static void guiTask(void *pvParameter)
 
     while (1) {
         /* Delay 1 tick (assumes FreeRTOS tick is 10ms */
-        vTaskDelay(pdMS_TO_TICKS(10));
+        vTaskDelay(pdMS_TO_TICKS(20));
 
         /* Try to take the semaphore, call lvgl related function on success */
         if (pdTRUE == xSemaphoreTake(xGuiSemaphore, portMAX_DELAY)) {

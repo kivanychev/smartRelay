@@ -99,11 +99,11 @@ static void hw_ctrl_task(void *pvParameter)
     while(1)
     {
         adc_raw[0][0] = adc1_get_raw(ADC1_EXAMPLE_CHAN0);
-        ESP_LOGI(TAG_CH[0][0], "raw  data: %d", adc_raw[0][0]);
+        //ESP_LOGI(TAG_CH[0][0], "raw  data: %d", adc_raw[0][0]);
         //if (cali_enable) 
         {
             voltage = esp_adc_cal_raw_to_voltage(adc_raw[0][0], &adc1_chars);
-            ESP_LOGI(TAG_CH[0][0], "cali data: %d mV", voltage);
+            //ESP_LOGI(TAG_CH[0][0], "cali data: %d mV", voltage);
 
             Current = voltage * CURRENT_COEFF;
         }
