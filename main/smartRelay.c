@@ -186,19 +186,20 @@ static void create_controls(void)
     lv_label_set_text(fan_label, "Fan speed:" );
     lv_obj_set_width(fan_label, 150);
 
+    // LABEL FOR HEATER
+    lv_obj_t* heater_label = lv_label_create(lv_scr_act(), NULL);
+    lv_obj_align(heater_label, NULL, LV_ALIGN_IN_LEFT_MID, 1, 60);
+
+    lv_label_set_text(heater_label, "Heater state:" );
+    lv_obj_set_width(heater_label, 150);
+
     // LABEL FOR LIGHT
     lv_obj_t* light_label = lv_label_create(lv_scr_act(), NULL);
-    lv_obj_align(light_label, NULL, LV_ALIGN_IN_LEFT_MID, 1, 60);
+    lv_obj_align(light_label, NULL, LV_ALIGN_IN_LEFT_MID, 1, 120);
 
     lv_label_set_text(light_label, "Light state:" );
     lv_obj_set_width(light_label, 150);
 
-    // LABEL FOR HEATER
-    lv_obj_t* heater_label = lv_label_create(lv_scr_act(), NULL);
-    lv_obj_align(heater_label, NULL, LV_ALIGN_IN_LEFT_MID, 1, 120);
-
-    lv_label_set_text(heater_label, "Heater state:" );
-    lv_obj_set_width(heater_label, 150);
 
 
 }
