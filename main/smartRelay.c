@@ -359,7 +359,7 @@ static void lv_tick_task(void *arg) {
  EXTERNAL FUNCTIONS
  **********************************************************/
 
-void smartRelay_set_fan_speed(uint8_t new_fan_speed)
+void smartRelay_set_fan_speed(uint32_t new_fan_speed)
 {
     if(new_fan_speed > 5) {
         new_fan_speed = 5;

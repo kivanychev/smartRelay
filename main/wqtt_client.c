@@ -11,6 +11,7 @@
 
 #include "wqtt_client.h"
 #include "hw_ctrl.h"
+#include "smartRelay.h"
 
 
 
@@ -89,6 +90,7 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
     esp_mqtt_event_handle_t event = event_data;
     esp_mqtt_client_handle_t client = event->client;
     int msg_id;
+    hw_electr_lvl_t fan_value;
 
     switch ((esp_mqtt_event_id_t)event_id) {
     case MQTT_EVENT_CONNECTED:
@@ -133,29 +135,60 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
 
         if(is_topic_equals(event->topic, event->topic_len, Heater_topic) == true )
         {
+            if(event->data[0] == '1')
+            {
+                // HW
 
+                // UI
+                smartRelay_set_heater_state(HW_ON);
+            } 
+            else if (event->data[0] == '0')
+            {
+                // HW
+
+                // UI
+                smartRelay_set_heater_state(HW_OFF);
+            }
         } 
         else if (is_topic_equals(event->topic, event->topic_len, Fan_topic) == true)
         {
+            fan_value = (hw_electr_lvl_t)(event->data[0] - '0');
+
+            // HW
+
+            // UI
+            smartRelay_set_fan_speed(fan_value);
 
         }
         else if (is_topic_equals(event->topic, event->topic_len, Light_topic) == true)
         {
+            if(event->data[0] == '1')
+            {
+                // HW
 
+                // UI
+                smartRelay_set_light_state(HW_ON);
+            } 
+            else if (event->data[0] == '0')
+            {
+                // HW
+
+                // UI
+                smartRelay_set_light_state(HW_OFF);
+            }
         }
         else if (is_topic_equals(event->topic, event->topic_len, LED_topic) == true)
         {
-
+            if(event->data[0] == '1')
+            {
+                hw_ctrl_set_LED_state(HW_ON);
+            } else if (event->data[0] == '0')
+            {
+                hw_ctrl_set_LED_state(HW_OFF);
+            }
         }
 
 
-        if(event->data[0] == '1')
-        {
-            hw_ctrl_set_LED_state(HW_ON);
-        } else if (event->data[0] == '0')
-        {
-            hw_ctrl_set_LED_state(HW_OFF);
-        }
 
         break;
     case MQTT_EVENT_ERROR:
