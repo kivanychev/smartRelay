@@ -32,8 +32,8 @@ static const char *TAG_CH[2][10] = {{"ADC1_CH6"}, {"ADC2_CH0"}};
  MACROS
  ***********************/
 
-#define Lamp3ON()       gpio_set_level(LED4_GPIO, 0)
-#define Lamp3OFF()      gpio_set_level(LED4_GPIO, 1)
+#define LED_ON()       gpio_set_level(LED4_GPIO, 0)
+#define LED_OFF()      gpio_set_level(LED4_GPIO, 1)
 
 
 /***********************
@@ -57,12 +57,13 @@ static esp_adc_cal_characteristics_t adc1_chars;
 static uint16_t current_value = 0;
 
 
-static uint8_t      Load2_level = 0;
-static hw_state_t   Load1_state = HW_OFF;
-static hw_state_t   Load3_state = HW_OFF;
-static uint32_t     Current = 0;
+static uint8_t          Load2_level = 1;
+static hw_state_t       Load1_state = HW_OFF;
+static hw_state_t       Load3_state = HW_OFF;
+static uint32_t         Current = 0;
+static hw_electr_lvl_t  Fan_mode = HW_LVL_OFF;
 
-static hw_state_t lamp3_new_state = HW_OFF;
+static hw_state_t       LED_state = HW_OFF;
 
 /************************************
  STATIC FUNCTION DEFINITIONS
@@ -83,7 +84,7 @@ static void hw_ctrl_task(void *pvParameter)
     /* Set the GPIO as a push/pull output */
     gpio_set_direction(LED4_GPIO, GPIO_MODE_OUTPUT);
 
-    Lamp3OFF();
+    LED_OFF();
 
     /* Create and start a periodic timer interrupt to call update_current_value() */
     const esp_timer_create_args_t periodic_timer_args = {
@@ -240,19 +241,19 @@ uint32_t hw_ctrl_get_Current(void)
 }
 
 /**
- * @brief Sets Lams3 state
+ * @brief Sets LED state
  * 
- * @param lamp3_new_state: HW_ON, HW_OFF
+ * @param LED_new_state: HW_ON, HW_OFF
  */
-void hw_ctrl_set_lamp3_state(hw_state_t lamp3_new_state)
+void hw_ctrl_set_LED_state(hw_state_t LED_new_state)
 {
-    lamp3_state = lamp3_new_state;
+    LED_state = LED_new_state;
 
-    if(lamp3_new_state == HW_ON)
+    if(LED_state == HW_ON)
     {
-        Lamp3ON();
+        LED_ON();
     } else {
-        Lamp3OFF();
+        LED_OFF();
     }
 }
 
@@ -261,7 +262,7 @@ void hw_ctrl_set_lamp3_state(hw_state_t lamp3_new_state)
  * 
  * @return HW_ON, HW_OFF
  */
-hw_state_t  hw_ctrl_get_lamp3_state(void)
+hw_state_t  hw_ctrl_get_LED_state(void)
 {
-    return lamp3_state;
+    return LED_state;
 }

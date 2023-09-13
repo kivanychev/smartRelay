@@ -27,6 +27,12 @@ static esp_mqtt_client_handle_t client;
 static const char *TAG = "WQTT";
 
 
+static hw_state_t   Heater_state = HW_OFF;
+static hw_state_t   Light_state = HW_OFF;
+static hw_state_t   LED_state = HW_OFF;
+static uint32_t     Current_value = 0;
+static uint8_t      Fan_speed = 1;
+
 /***********************
  *  FUNCTION DEFINITIONS
  ***********************/
@@ -43,6 +49,28 @@ static void log_error_if_nonzero(const char *message, int error_code)
     if (error_code != 0) {
         ESP_LOGE(TAG, "Last error %s: 0x%x", message, error_code);
     }
+}
+
+/**
+ * @brief Detects if the topic name coming from the event corresponds to the sample topic name
+ * 
+ * @param event_topic_name 
+ * @param topic_len 
+ * @param topic_name_to_compare_with 
+ * @return true     topic names match
+ * @return false    if topic names did not match
+ */
+static bool is_topic_equals(char* event_topic_name, int topic_len, char* topic_name_to_compare_with)
+{
+    for(int idx = 0; idx < topic_len; ++idx)
+    {
+        if(event_topic_name[idx] != topic_name_to_compare_with[idx])
+        {
+            return false;
+        }
+    }
+
+    return true;
 }
 
 /**
@@ -66,9 +94,18 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
     case MQTT_EVENT_CONNECTED:
         ESP_LOGI(TAG, "MQTT_EVENT_CONNECTED");
 
+        msg_id = esp_mqtt_client_subscribe(client, LED_topic, 0);
+        ESP_LOGI(TAG, LED_topic " subscribe successful, msg_id=%d", msg_id);
 
-        msg_id = esp_mqtt_client_subscribe(client, "Lamp3", 0);
-        ESP_LOGI(TAG, "sent subscribe successful, msg_id=%d", msg_id);
+        msg_id = esp_mqtt_client_subscribe(client, Heater_topic, 0);
+        ESP_LOGI(TAG, Heater_topic " subscribe successful, msg_id=%d", msg_id);
+
+        msg_id = esp_mqtt_client_subscribe(client, Fan_topic, 0);
+        ESP_LOGI(TAG, Fan_topic " subscribe successful, msg_id=%d", msg_id);
+
+        msg_id = esp_mqtt_client_subscribe(client, Light_topic, 0);
+        ESP_LOGI(TAG, Light_topic " subscribe successful, msg_id=%d", msg_id);
+
         break;
 
     case MQTT_EVENT_DISCONNECTED:
@@ -79,23 +116,45 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
         ESP_LOGI(TAG, "MQTT_EVENT_SUBSCRIBED, msg_id=%d", event->msg_id);
 
         break;
+
     case MQTT_EVENT_UNSUBSCRIBED:
         ESP_LOGI(TAG, "MQTT_EVENT_UNSUBSCRIBED, msg_id=%d", event->msg_id);
         break;
+
     case MQTT_EVENT_PUBLISHED:
         ESP_LOGI(TAG, "MQTT_EVENT_PUBLISHED, msg_id=%d", event->msg_id);
         break;
+        
     case MQTT_EVENT_DATA:
         ESP_LOGI(TAG, "MQTT_EVENT_DATA");
-        printf("TOPIC=%.*s\r\n", event->topic_len, event->topic);
+        printf("TOPIC=%.*s  ", event->topic_len, event->topic);
         printf("DATA=%.*s\r\n", event->data_len, event->data);
+
+
+        if(is_topic_equals(event->topic, event->topic_len, Heater_topic) == true )
+        {
+
+        } 
+        else if (is_topic_equals(event->topic, event->topic_len, Fan_topic) == true)
+        {
+
+        }
+        else if (is_topic_equals(event->topic, event->topic_len, Light_topic) == true)
+        {
+
+        }
+        else if (is_topic_equals(event->topic, event->topic_len, LED_topic) == true)
+        {
+
+        }
+
 
         if(event->data[0] == '1')
         {
-            hw_ctrl_set_lamp3_state(HW_ON);
+            hw_ctrl_set_LED_state(HW_ON);
         } else if (event->data[0] == '0')
         {
-            hw_ctrl_set_lamp3_state(HW_OFF);
+            hw_ctrl_set_LED_state(HW_OFF);
         }
 
         break;
@@ -149,6 +208,22 @@ void wqtt_client_set_current( uint32_t current )
 
     sprintf( str, "%d", current );
 
-    msg_id = esp_mqtt_client_publish(client, "Current", str, 0, 1, 0);
-    ESP_LOGI(TAG, "sent publish successful, msg_id=%d", msg_id);
+    msg_id = esp_mqtt_client_publish(client, Current_topic, str, 0, 1, 0);
+    ESP_LOGI(TAG, Current_topic " publish successful, msg_id=%d", msg_id);
+
 }
+
+
+void        wqtt_client_set_Fan_level(uint8_t level);
+uint8_t     wqtt_client_get_Fan_level(void);
+
+void        wqtt_client_set_Heater_state(hw_state_t state);
+hw_state_t  wqtt_client_get_Heater_state(void);
+
+void        wqtt_client_set_Light_state(hw_state_t state);
+hw_state_t  wqtt_client_get_Light_state(void);
+
+uint32_t    wqtt_client_get_Current(void);
+
+void        wqtt_client_set_LED_state(hw_state_t LED_new_state);
+hw_state_t  wqtt_client_get_LED_state(void);

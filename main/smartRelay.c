@@ -231,7 +231,6 @@ static void guiTask(void *pvParameter)
 
     uint32_t size_in_px = DISP_BUF_SIZE;
 
-
     /* Initialize the working buffer depending on the selected display.
      * NOTE: buf2 == NULL when using monochrome displays. */
     lv_disp_buf_init(&disp_buf, buf1, buf2, size_in_px);
@@ -264,28 +263,28 @@ static void guiTask(void *pvParameter)
 
     create_controls();
 
-
     while (1) {
-        /* Delay 1 tick (assumes FreeRTOS tick is 10ms */
-        vTaskDelay(pdMS_TO_TICKS(20));
+        // Delay 1 tick (assumes FreeRTOS tick is 10ms
+        vTaskDelay(pdMS_TO_TICKS(10));
 
-        /* Try to take the semaphore, call lvgl related function on success */
-        if (pdTRUE == xSemaphoreTake(xGuiSemaphore, portMAX_DELAY)) {
+        // Try to take the semaphore, call lvgl related function on success
+        if (pdTRUE == xSemaphoreTake(xGuiSemaphore, portMAX_DELAY)) 
+        {
             lv_task_handler();
         
             xSemaphoreGive(xGuiSemaphore);
-       }
+        }
 
         // Update Current value on the screen
         current = hw_ctrl_get_Current();
         sprintf(str, "%d", current);
         lv_table_set_cell_value(table, 1, 1, str);
 
-        /* Update Wifi connection IP address */
+        // Update Wifi connection IP address
         lv_table_set_cell_value(table, 0, 1, wifi_get_ip() );
 
         // Lamp3 state display
-        if(hw_ctrl_get_lamp3_state() == HW_OFF )
+        if(hw_ctrl_get_LED_state() == HW_OFF )
         {
             //lv_table_set_cell_value(table, 0, 1, "OFF");
         } else {
@@ -294,11 +293,8 @@ static void guiTask(void *pvParameter)
 
     }
 
-    /* A task should NEVER return */
     free(buf1);
-#ifndef CONFIG_LV_TFT_DISPLAY_MONOCHROME
     free(buf2);
-#endif
     vTaskDelete(NULL);
 }
 
