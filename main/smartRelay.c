@@ -65,15 +65,27 @@ static lv_obj_t*    light_btn;
 
 static void lv_spinbox_increment_event_cb(lv_obj_t * btn, lv_event_t e)
 {
+    hw_electr_lvl_t fan_speed_lvl;
+   
     if(e == LV_EVENT_PRESSED ) {
         lv_spinbox_increment(spinbox);
+
+        fan_speed_lvl = (hw_electr_lvl_t )(lv_spinbox_get_value(spinbox));
+        wqtt_client_set_Fan_level(fan_speed_lvl);
+        hw_ctrl_set_Fan_level(fan_speed_lvl);
     }
 }
 
 static void lv_spinbox_decrement_event_cb(lv_obj_t * btn, lv_event_t e)
 {
+    hw_electr_lvl_t fan_speed_lvl;
+
     if(e == LV_EVENT_PRESSED ) {
         lv_spinbox_decrement(spinbox);
+
+        fan_speed_lvl = (hw_electr_lvl_t )(lv_spinbox_get_value(spinbox));
+        wqtt_client_set_Fan_level(fan_speed_lvl);
+        hw_ctrl_set_Fan_level(fan_speed_lvl);
     }
 }
 
@@ -88,11 +100,16 @@ static void heater_event_handler(lv_obj_t * obj, lv_event_t event)
         {
             heater_state = HW_OFF;
             lv_obj_set_style_local_value_str(obj, LV_BTN_PART_MAIN, LV_STATE_DEFAULT, LV_SYMBOL_EYE_CLOSE);
+            wqtt_client_set_Heater_state(HW_OFF);
+            hw_ctrl_set_Heater_state(HW_OFF);
         } else {
             heater_state = HW_ON;
             lv_obj_set_style_local_value_str(obj, LV_BTN_PART_MAIN, LV_STATE_DEFAULT, LV_SYMBOL_EYE_OPEN);
+            wqtt_client_set_Heater_state(HW_ON);
+            hw_ctrl_set_Heater_state(HW_ON);
         }
     }
+
 }
 
 // LIGHT CONTROL
@@ -105,9 +122,13 @@ static void light_event_handler(lv_obj_t * obj, lv_event_t event)
         {
             light_state = HW_OFF;
             lv_obj_set_style_local_value_str(obj, LV_BTN_PART_MAIN, LV_STATE_DEFAULT, LV_SYMBOL_EYE_CLOSE);
+            wqtt_client_set_Light_state(HW_OFF);
+            hw_ctrl_set_Light_state(HW_OFF);
         } else {
             light_state = HW_ON;
             lv_obj_set_style_local_value_str(obj, LV_BTN_PART_MAIN, LV_STATE_DEFAULT, LV_SYMBOL_EYE_OPEN);
+            wqtt_client_set_Light_state(HW_ON);
+            hw_ctrl_set_Light_state(HW_ON);
         }
     }
 }
@@ -199,8 +220,6 @@ static void create_controls(void)
 
     lv_label_set_text(light_label, "Light state:" );
     lv_obj_set_width(light_label, 150);
-
-
 
 }
 

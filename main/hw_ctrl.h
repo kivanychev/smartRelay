@@ -40,20 +40,20 @@ typedef enum {
  FUNCTION PROTTOTYPES
 ***********************************/
 
-void        hw_ctrl_start();
+void            hw_ctrl_start();
 
-void        hw_ctrl_set_Load2_level(uint8_t level);
-uint8_t     hw_ctrl_get_Load2_level(void);
+void            hw_ctrl_set_Load2_level(hw_electr_lvl_t level);
+hw_electr_lvl_t hw_ctrl_get_Load2_level(void);
 
-void        hw_ctrl_set_Load1_state(hw_state_t state);
-hw_state_t  hw_ctrl_get_Load1_state(void);
+void            hw_ctrl_set_Load1_state(hw_state_t state);
+hw_state_t      hw_ctrl_get_Load1_state(void);
 
-void        hw_ctrl_set_Load3_state(hw_state_t state);
-hw_state_t  hw_ctrl_get_Load3_state(void);
+void            hw_ctrl_set_Load3_state(hw_state_t state);
+hw_state_t      hw_ctrl_get_Load3_state(void);
 
-uint32_t    hw_ctrl_get_Current(void);
+uint32_t        hw_ctrl_get_Current(void);
 
-void        hw_ctrl_set_LED_state(hw_state_t LED_new_state);
-hw_state_t  hw_ctrl_get_LED_state(void);
+void            hw_ctrl_set_LED_state(hw_state_t LED_new_state);
+hw_state_t      hw_ctrl_get_LED_state(void);
 
 #endif // _HW_CTRL_H_

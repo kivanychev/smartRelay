@@ -28,11 +28,11 @@ static esp_mqtt_client_handle_t client;
 static const char *TAG = "WQTT";
 
 
-static hw_state_t   Heater_state = HW_OFF;
-static hw_state_t   Light_state = HW_OFF;
-static hw_state_t   LED_state = HW_OFF;
-static uint32_t     Current_value = 0;
-static uint8_t      Fan_speed = 1;
+static hw_state_t       Heater_state = HW_OFF;
+static hw_state_t       Light_state = HW_OFF;
+static hw_state_t       LED_state = HW_OFF;
+static uint32_t         Current_value = 0;
+static hw_electr_lvl_t  Fan_speed = HW_LVL_OFF;
 
 /***********************
  *  FUNCTION DEFINITIONS
@@ -138,6 +138,7 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
             if(event->data[0] == '1')
             {
                 // HW
+                hw_ctrl_set_Load1_state(HW_ON);
 
                 // UI
                 smartRelay_set_heater_state(HW_ON);
@@ -145,6 +146,7 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
             else if (event->data[0] == '0')
             {
                 // HW
+                hw_ctrl_set_Load1_state(HW_OFF);
 
                 // UI
                 smartRelay_set_heater_state(HW_OFF);
@@ -155,6 +157,7 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
             fan_value = (hw_electr_lvl_t)(event->data[0] - '0');
 
             // HW
+            hw_ctrl_set_Load2_level(fan_value);
 
             // UI
             smartRelay_set_fan_speed(fan_value);
@@ -165,6 +168,7 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
             if(event->data[0] == '1')
             {
                 // HW
+                hw_ctrl_set_Load3_state(HW_ON);
 
                 // UI
                 smartRelay_set_light_state(HW_ON);
@@ -172,6 +176,7 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
             else if (event->data[0] == '0')
             {
                 // HW
+                hw_ctrl_set_Load3_state(HW_OFF);
 
                 // UI
                 smartRelay_set_light_state(HW_OFF);
@@ -179,13 +184,17 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
         }
         else if (is_topic_equals(event->topic, event->topic_len, LED_topic) == true)
         {
+            //HW
             if(event->data[0] == '1')
             {
                 hw_ctrl_set_LED_state(HW_ON);
-            } else if (event->data[0] == '0')
+            } 
+            else if (event->data[0] == '0')
             {
                 hw_ctrl_set_LED_state(HW_OFF);
             }
+
+            //No UI part
         }
 
 
@@ -228,11 +237,14 @@ void wqtt_client_start(void)
     esp_mqtt_client_start(client);
 
 }
+/**************************************************
+ * GET / SET FUNCTIONS
+ **************************************************/
 
 /**
- * @brief Updates the Current value for WQTT cloud
+ * @brief   Sets the Current value for WQTT cloud
  * 
- * @param Current Value of the current in mA
+ * @param current Value of the current in mA
  */
 void wqtt_client_set_current( uint32_t current )
 {
@@ -243,20 +255,124 @@ void wqtt_client_set_current( uint32_t current )
 
     msg_id = esp_mqtt_client_publish(client, Current_topic, str, 0, 1, 0);
     ESP_LOGI(TAG, Current_topic " publish successful, msg_id=%d", msg_id);
-
 }
 
 
-void        wqtt_client_set_Fan_level(uint8_t level);
-uint8_t     wqtt_client_get_Fan_level(void);
+/**
+ * @brief   Sets the Fan speed level
+ * 
+ * @param   HW_ON, HW_OFF
+ */
+void wqtt_client_set_Fan_level(hw_electr_lvl_t level)
+{
+    int msg_id;
+    char param[] = { ' ', '\0'};
 
-void        wqtt_client_set_Heater_state(hw_state_t state);
-hw_state_t  wqtt_client_get_Heater_state(void);
+    Fan_speed = level;
+    param[0] = level + '0';
 
-void        wqtt_client_set_Light_state(hw_state_t state);
-hw_state_t  wqtt_client_get_Light_state(void);
+    msg_id = esp_mqtt_client_publish(client, Fan_topic, param, 0, 1, 0);
+    ESP_LOGI(TAG, Fan_topic " publish successful, msg_id=%d", msg_id);
+}
 
-uint32_t    wqtt_client_get_Current(void);
 
-void        wqtt_client_set_LED_state(hw_state_t LED_new_state);
-hw_state_t  wqtt_client_get_LED_state(void);
+/**
+ * @brief   Gets the level of Fan speed
+ * 
+ * @return  HW_LVL_OFF .. HW_LVL_VERY_HIGH 
+ */
+hw_electr_lvl_t wqtt_client_get_Fan_level(void)
+{
+    return Fan_speed;
+}
+
+/**
+ * @brief   Sets Heater state
+ * 
+ * @param   HW_ON, WH_OFF
+ */
+void wqtt_client_set_Heater_state(hw_state_t state)
+{
+    int msg_id;
+    char param[] = { ' ', '\0'};
+
+    Heater_state = state;
+    param[0] = state + '0';
+
+    msg_id = esp_mqtt_client_publish(client, Heater_topic, param, 0, 1, 0);
+    ESP_LOGI(TAG, Heater_topic " publish successful, msg_id=%d", msg_id);
+}
+
+/**
+ * @brief   Gets the Heater state
+ * 
+ * @return  HW_ON, HW_OFF
+ */
+hw_state_t  wqtt_client_get_Heater_state(void)
+{
+    return Heater_state;
+}
+
+/**
+ * @brief   Sets the Light state
+ * 
+ * @param   HW_ON, HW_OFF
+ */
+void wqtt_client_set_Light_state(hw_state_t state)
+{
+    int msg_id;
+    char param[] = { ' ', '\0'};
+
+    Light_state = state;
+    param[0] = state + '0';
+
+    msg_id = esp_mqtt_client_publish(client, Light_topic, param, 0, 1, 0);
+    ESP_LOGI(TAG, Light_topic " publish successful, msg_id=%d", msg_id);
+}
+
+/**
+ * @brief   Gets Light state
+ * 
+ * @return  HW_ON, HW_OFF 
+ */
+hw_state_t wqtt_client_get_Light_state(void)
+{
+    return Light_state;
+}
+
+/**
+ * @brief   Gets the Current value in mA
+ * 
+ * @return  Current value in mA
+ */
+uint32_t wqtt_client_get_Current(void)
+{
+    return Current_value;
+}
+
+/**
+ * @brief   Sets new state for LED
+ * 
+ * @param   WH_ON, HW_OFF
+ */
+void wqtt_client_set_LED_state(hw_state_t LED_new_state)
+{
+    int msg_id;
+    char param[] = { ' ', '\0'};
+
+    LED_state = LED_new_state;
+    param[0] = LED_new_state + '0';
+
+    msg_id = esp_mqtt_client_publish(client, LED_topic, param, 0, 1, 0);
+    ESP_LOGI(TAG, LED_topic " publish successful, msg_id=%d", msg_id);
+}
+
+/**
+ * @brief   Gets LED state
+ * 
+ * @return HW_ON, HW_OFF
+ */
+hw_state_t  wqtt_client_get_LED_state(void)
+{
+    return LED_state;
+}

@@ -47,8 +47,6 @@ static void update_current_value(void *arg);
  LOCAL VARIABLES
  ***********************/
 
-static hw_state_t lamp3_state = HW_OFF;
-
 static const char *TAG = "HW CTRL";
 
 static uint32_t voltage = 0;
@@ -57,11 +55,10 @@ static esp_adc_cal_characteristics_t adc1_chars;
 static uint16_t current_value = 0;
 
 
-static uint8_t          Load2_level = 1;
+static hw_electr_lvl_t  Load2_level = HW_LVL_OFF;
 static hw_state_t       Load1_state = HW_OFF;
 static hw_state_t       Load3_state = HW_OFF;
 static uint32_t         Current = 0;
-static hw_electr_lvl_t  Fan_mode = HW_LVL_OFF;
 
 static hw_state_t       LED_state = HW_OFF;
 
@@ -170,11 +167,11 @@ void hw_ctrl_start(void)
  * 
  * @param level 0..100 (%)
  */
-void hw_ctrl_set_Load2_level(uint8_t level)
+void hw_ctrl_set_Load2_level(hw_electr_lvl_t level)
 {
-    if(level > 100)
+    if(level > HW_LVL_VERY_HIGH )
     {
-        level = 100;
+        level = HW_LVL_VERY_HIGH;
     }
 
     Load2_level = level;
@@ -185,7 +182,7 @@ void hw_ctrl_set_Load2_level(uint8_t level)
  * 
  * @return uint8_t Level of 2 ( 0 .. 100% )
  */
-uint8_t hw_ctrl_get_Load2_level(void)
+hw_electr_lvl_t hw_ctrl_get_Load2_level(void)
 {
     return Load2_level;
 }
