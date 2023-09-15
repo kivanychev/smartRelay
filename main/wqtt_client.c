@@ -141,7 +141,7 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
                 hw_ctrl_set_Load1_state(HW_ON);
 
                 // UI
-                smartRelay_set_heater_state(HW_ON);
+                ui_set_heater_state(HW_ON);
             } 
             else if (event->data[0] == '0')
             {
@@ -149,7 +149,7 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
                 hw_ctrl_set_Load1_state(HW_OFF);
 
                 // UI
-                smartRelay_set_heater_state(HW_OFF);
+                ui_set_heater_state(HW_OFF);
             }
         } 
         else if (is_topic_equals(event->topic, event->topic_len, Fan_topic) == true)
@@ -160,7 +160,7 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
             hw_ctrl_set_Load2_level(fan_value);
 
             // UI
-            smartRelay_set_fan_speed(fan_value);
+            ui_set_fan_speed(fan_value);
 
         }
         else if (is_topic_equals(event->topic, event->topic_len, Light_topic) == true)
@@ -171,7 +171,7 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
                 hw_ctrl_set_Load3_state(HW_ON);
 
                 // UI
-                smartRelay_set_light_state(HW_ON);
+                ui_set_light_state(HW_ON);
             } 
             else if (event->data[0] == '0')
             {
@@ -179,7 +179,7 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
                 hw_ctrl_set_Load3_state(HW_OFF);
 
                 // UI
-                smartRelay_set_light_state(HW_OFF);
+                ui_set_light_state(HW_OFF);
             }
         }
         else if (is_topic_equals(event->topic, event->topic_len, LED_topic) == true)

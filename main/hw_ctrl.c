@@ -12,41 +12,52 @@
 #include "wqtt_client.h"
 
 
-/***********************
+/*******************************************************
  CONSTANTS
- ***********************/
+ *******************************************************/
 
-#define CURRENT_COEFF   1 / 1
-
-//ADC Channels
-#define ADC1_EXAMPLE_CHAN0          ADC1_CHANNEL_6
-static const char *TAG_CH[2][10] = {{"ADC1_CH6"}, {"ADC2_CH0"}};
+#define CURRENT_COEFF           1 / 10
+#define ADC1_CURRENT_CHANNEL    ADC1_CHANNEL_4
 
 //ADC Attenuation
-#define ADC_EXAMPLE_ATTEN           ADC_ATTEN_DB_11
+#define ADC_EXAMPLE_ATTEN       ADC_ATTEN_DB_11
 
 //ADC Calibration
-#define ADC_EXAMPLE_CALI_SCHEME     ESP_ADC_CAL_VAL_EFUSE_VREF
+#define ADC_EXAMPLE_CALI_SCHEME ESP_ADC_CAL_VAL_EFUSE_VREF
 
-/***********************
+// Pin assignments
+#define LED4_GPIO               27
+#define LOAD1_PIN               22   
+#define LOAD2_PIN               13
+#define LOAD3_PIN               17      // RELAY
+#define ZERO_PIN                16
+
+/*******************************************************
  MACROS
- ***********************/
+ *******************************************************/
 
 #define LED_ON()       gpio_set_level(LED4_GPIO, 0)
 #define LED_OFF()      gpio_set_level(LED4_GPIO, 1)
 
+#define LOAD1_ON()     gpio_set_level(LED4_GPIO, 1)
+#define LOAD1_OFF()    gpio_set_level(LED4_GPIO, 0)
 
-/***********************
+// RELAY
+#define LOAD3_ON()     gpio_set_level(LED4_GPIO, 1)
+#define LOAD3_OFF()    gpio_set_level(LED4_GPIO, 0)
+
+
+/*******************************************************
  FUNCTION PROTOTYPES
- ***********************/
+ *******************************************************/
 
 static bool adc_calibration_init(void);
 static void update_current_value(void *arg);
 
-/***********************
+/*******************************************************
  LOCAL VARIABLES
- ***********************/
-
+ *******************************************************/
+//ADC Channels
 static const char *TAG = "HW CTRL";
 
 static uint32_t voltage = 0;
@@ -62,24 +73,42 @@ static uint32_t         Current = 0;
 
 static hw_state_t       LED_state = HW_OFF;
 
-/************************************
+
+
+
+/*******************************************************
  STATIC FUNCTION DEFINITIONS
- *************************************/
+ *******************************************************/
 
 
 static void hw_ctrl_task(void *pvParameter)
 {
     bool cali_enable = adc_calibration_init();
-    static int adc_raw[2][10];
+    static int adc_raw;
 
     //ADC1 config
     ESP_ERROR_CHECK(adc1_config_width(ADC_WIDTH_BIT_DEFAULT));
-    ESP_ERROR_CHECK(adc1_config_channel_atten(ADC1_EXAMPLE_CHAN0, ADC_EXAMPLE_ATTEN));
+    ESP_ERROR_CHECK(adc1_config_channel_atten(ADC1_CURRENT_CHANNEL, ADC_EXAMPLE_ATTEN));
 
     // Configure LED4 pin for output
     gpio_reset_pin(LED4_GPIO);
-    /* Set the GPIO as a push/pull output */
-    gpio_set_direction(LED4_GPIO, GPIO_MODE_OUTPUT);
+    gpio_set_direction(LED4_GPIO, GPIO_MODE_OUTPUT);    // Set the GPIO as a push/pull output
+
+    // Configure Load1 pin for output
+    gpio_reset_pin(LOAD1_PIN);
+    gpio_set_direction(LED4_GPIO, GPIO_MODE_OUTPUT);    // Set the GPIO as a push/pull output
+    
+    // Configure Load2 (variable power) pin for output
+    gpio_reset_pin(LOAD2_PIN);
+    gpio_set_direction(LED4_GPIO, GPIO_MODE_OUTPUT);    // Set the GPIO as a push/pull output
+    
+    // Configure Load3 (RELAY) pin for output
+    gpio_reset_pin(LOAD3_PIN);
+    gpio_set_direction(LED4_GPIO, GPIO_MODE_OUTPUT);    // Set the GPIO as a push/pull output
+    
+    // Configure ZERO sensor pin for input
+    gpio_reset_pin(ZERO_PIN);
+    gpio_set_direction(LED4_GPIO, GPIO_MODE_INPUT);    // Set the GPIO as input
 
     LED_OFF();
 
@@ -96,17 +125,17 @@ static void hw_ctrl_task(void *pvParameter)
 
     while(1)
     {
-        adc_raw[0][0] = adc1_get_raw(ADC1_EXAMPLE_CHAN0);
-        //ESP_LOGI(TAG_CH[0][0], "raw  data: %d", adc_raw[0][0]);
-        //if (cali_enable) 
+        adc_raw = adc1_get_raw(ADC1_CURRENT_CHANNEL);
+        ESP_LOGI(TAG, "Current raw data: %d", adc_raw);
+        if (cali_enable)
         {
-            voltage = esp_adc_cal_raw_to_voltage(adc_raw[0][0], &adc1_chars);
-            //ESP_LOGI(TAG_CH[0][0], "cali data: %d mV", voltage);
+            voltage = esp_adc_cal_raw_to_voltage(adc_raw, &adc1_chars);
+            ESP_LOGI(TAG, ">>>>>>>>>> cali data: %d mV", voltage);
 
             Current = voltage * CURRENT_COEFF;
         }
 
-        vTaskDelay(pdMS_TO_TICKS(10));
+        vTaskDelay(pdMS_TO_TICKS(1000));          // 1s
     }
 }
 
@@ -190,10 +219,18 @@ hw_electr_lvl_t hw_ctrl_get_Load2_level(void)
 /**
  * @brief   Set Load1 state
  * 
- * @param state     HW_ON, HW_OFF
+ * @param state HW_ON, HW_OFF
  */
 void hw_ctrl_set_Load1_state(hw_state_t state)
 {
+    Load1_state = state;
+
+    if(Load1_state == HW_ON)
+    {
+        LOAD1_ON();
+    } else {
+        LOAD1_OFF();
+    }
 
 }
 
@@ -214,7 +251,14 @@ hw_state_t hw_ctrl_get_Load1_state(void)
  */
 void hw_ctrl_set_Load3_state(hw_state_t state)
 {
+    Load3_state = state;
 
+    if(Load3_state == HW_ON)
+    {
+        LOAD3_ON();
+    } else {
+        LOAD3_OFF();
+    }
 }
 
 /**

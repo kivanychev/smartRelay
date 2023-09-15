@@ -7,7 +7,6 @@
  CONSTANTS AND MACROS
 ***********************************/
 
-#define LED4_GPIO           27
 #define LV_TICK_PERIOD_MS   1
 
 // Covers for function names according to functional intention

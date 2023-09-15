@@ -25,16 +25,6 @@
 #include "wqtt_client.h"
 #include "smartRelay.h"
 
-static const char *TAG = "SMART RELAY";
-
-/* Creates a semaphore to handle concurrent call to lvgl stuff
- * If you wish to call *any* lvgl function from other threads/tasks
- * you should lock on the very same semaphore! */
-SemaphoreHandle_t xGuiSemaphore;
-
-static uint16_t current_value = 0;
-static lv_obj_t * table;
-
 /********************************************************
  *  STATIC PROTOTYPES
  ********************************************************/
@@ -47,21 +37,29 @@ static void create_controls(void);
  *  STATIC VARIABLES
  *******************************************************/
 
-static uint32_t     fan_speed = 1;
+static uint32_t     fan_speed = HW_LVL_LOW;
 static hw_state_t   light_state = HW_OFF;
 static hw_state_t   heater_state = HW_OFF;
 static uint32_t     current = 0;
 
 // Control objects
+static lv_obj_t *   table;
 static lv_obj_t*    spinbox;
 static lv_obj_t*    heater_btn;
 static lv_obj_t*    light_btn;
+
+static const char *TAG = "SMART RELAY";
+
+/* Creates a semaphore to handle concurrent call to lvgl stuff
+ * If you wish to call *any* lvgl function from other threads/tasks
+ * you should lock on the very same semaphore! */
+SemaphoreHandle_t xGuiSemaphore;
 
 /*******************************************************
  *   LVGL CONTROLS HANDLING
  *******************************************************/
 
-// FAN CONTROLS
+// FAN EVENT HANDLER
 
 static void lv_spinbox_increment_event_cb(lv_obj_t * btn, lv_event_t e)
 {
@@ -90,7 +88,7 @@ static void lv_spinbox_decrement_event_cb(lv_obj_t * btn, lv_event_t e)
 }
 
 
-// HEATER CONTROL
+// HEATER EVENT HANDLER
 
 static void heater_event_handler(lv_obj_t * obj, lv_event_t event)
 {   
@@ -112,7 +110,7 @@ static void heater_event_handler(lv_obj_t * obj, lv_event_t event)
 
 }
 
-// LIGHT CONTROL
+// LIGHT EVENT HANDLER
 
 static void light_event_handler(lv_obj_t * obj, lv_event_t event)
 {
@@ -131,15 +129,14 @@ static void light_event_handler(lv_obj_t * obj, lv_event_t event)
             hw_ctrl_set_Light_state(HW_ON);
         }
     }
-}
+} 
 
 
 /**
- * Create a button with a label and react on click event.
+ * @brief Creates all controls on the screen.
  */
 static void create_controls(void)
 {
-
     // TABLE OF VALUES
 
     table = lv_table_create(lv_scr_act(), NULL);
@@ -303,14 +300,6 @@ static void guiTask(void *pvParameter)
         // Update Wifi connection IP address
         lv_table_set_cell_value(table, 0, 1, wifi_get_ip() );
 
-        // Lamp3 state display
-        if(hw_ctrl_get_LED_state() == HW_OFF )
-        {
-            //lv_table_set_cell_value(table, 0, 1, "OFF");
-        } else {
-            //lv_table_set_cell_value(table, 0, 1, "ON");
-        }
-
     }
 
     free(buf1);
@@ -354,12 +343,16 @@ void app_main(void)
     hw_ctrl_start();
     wqtt_client_start();
 
-    // Initiazlize controls
-    smartRelay_set_fan_speed(1);
-    smartRelay_set_current_value(0);
-    smartRelay_set_heater_state(HW_OFF);
-    smartRelay_set_light_state(HW_OFF);
+    // Initiazlize UI controls
+    ui_set_fan_speed(HW_LVL_OFF);
+    ui_set_current_value(0);
+    ui_set_heater_state(HW_OFF);
+    ui_set_light_state(HW_OFF);
 
+    // Initialize HW
+    hw_ctrl_set_Fan_level(HW_LVL_OFF);
+    hw_ctrl_set_Heater_state(HW_OFF);
+    hw_ctrl_set_Light_state(HW_LVL_OFF);
 }
 
 
@@ -379,7 +372,7 @@ static void lv_tick_task(void *arg) {
  EXTERNAL FUNCTIONS
  **********************************************************/
 
-void smartRelay_set_fan_speed(uint32_t new_fan_speed)
+void ui_set_fan_speed(uint32_t new_fan_speed)
 {
     if(new_fan_speed > 5) {
         new_fan_speed = 5;
@@ -388,7 +381,7 @@ void smartRelay_set_fan_speed(uint32_t new_fan_speed)
     lv_spinbox_set_value(spinbox, new_fan_speed);
 }
 
-void smartRelay_set_light_state(hw_state_t new_state)
+void ui_set_light_state(hw_state_t new_state)
 {
     if(new_state == HW_OFF)
     {
@@ -400,7 +393,7 @@ void smartRelay_set_light_state(hw_state_t new_state)
     }
 }
 
-void smartRelay_set_heater_state(hw_state_t new_state)
+void ui_set_heater_state(hw_state_t new_state)
 {
     if(new_state == HW_OFF)
     {
@@ -413,7 +406,7 @@ void smartRelay_set_heater_state(hw_state_t new_state)
 
 }
 
-void smartRelay_set_current_value(uint32_t new_current_value)
+void ui_set_current_value(uint32_t new_current_value)
 {
     char str[16];
 
