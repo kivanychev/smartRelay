@@ -369,7 +369,7 @@ static void lv_tick_task(void *arg) {
 
 
 /**********************************************************
- EXTERNAL FUNCTIONS
+ UI FUNCTIONS
  **********************************************************/
 
 void ui_set_fan_speed(uint32_t new_fan_speed)

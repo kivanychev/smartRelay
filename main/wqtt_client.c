@@ -137,6 +137,7 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
         {
             if(event->data[0] == '1')
             {
+                ESP_LOGI(TAG, "Heater ON");
                 // HW
                 hw_ctrl_set_Load1_state(HW_ON);
 
@@ -145,6 +146,7 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
             } 
             else if (event->data[0] == '0')
             {
+                ESP_LOGI(TAG, "Heater Off");
                 // HW
                 hw_ctrl_set_Load1_state(HW_OFF);
 
@@ -167,6 +169,8 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
         {
             if(event->data[0] == '1')
             {
+                ESP_LOGI(TAG, "Light ON");
+
                 // HW
                 hw_ctrl_set_Load3_state(HW_ON);
 
@@ -175,6 +179,7 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
             } 
             else if (event->data[0] == '0')
             {
+                ESP_LOGI(TAG, "Light OFF");
                 // HW
                 hw_ctrl_set_Load3_state(HW_OFF);
 
@@ -187,10 +192,13 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
             //HW
             if(event->data[0] == '1')
             {
+                ESP_LOGI(TAG, "LED ON");
                 hw_ctrl_set_LED_state(HW_ON);
             } 
             else if (event->data[0] == '0')
             {
+                ESP_LOGI(TAG, "LED OFF");
+
                 hw_ctrl_set_LED_state(HW_OFF);
             }
 

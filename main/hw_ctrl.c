@@ -39,12 +39,12 @@
 #define LED_ON()       gpio_set_level(LED4_GPIO, 0)
 #define LED_OFF()      gpio_set_level(LED4_GPIO, 1)
 
-#define LOAD1_ON()     gpio_set_level(LED4_GPIO, 1)
-#define LOAD1_OFF()    gpio_set_level(LED4_GPIO, 0)
+#define LOAD1_ON()     gpio_set_level(LOAD1_PIN, 1)
+#define LOAD1_OFF()    gpio_set_level(LOAD1_PIN, 0)
 
 // RELAY
-#define LOAD3_ON()     gpio_set_level(LED4_GPIO, 1)
-#define LOAD3_OFF()    gpio_set_level(LED4_GPIO, 0)
+#define LOAD3_ON()     gpio_set_level(LOAD3_PIN, 1)
+#define LOAD3_OFF()    gpio_set_level(LOAD3_PIN, 0)
 
 
 /*******************************************************
@@ -96,19 +96,19 @@ static void hw_ctrl_task(void *pvParameter)
 
     // Configure Load1 pin for output
     gpio_reset_pin(LOAD1_PIN);
-    gpio_set_direction(LED4_GPIO, GPIO_MODE_OUTPUT);    // Set the GPIO as a push/pull output
+    gpio_set_direction(LOAD1_PIN, GPIO_MODE_OUTPUT);    // Set the GPIO as a push/pull output
     
     // Configure Load2 (variable power) pin for output
     gpio_reset_pin(LOAD2_PIN);
-    gpio_set_direction(LED4_GPIO, GPIO_MODE_OUTPUT);    // Set the GPIO as a push/pull output
+    gpio_set_direction(LOAD2_PIN, GPIO_MODE_OUTPUT);    // Set the GPIO as a push/pull output
     
     // Configure Load3 (RELAY) pin for output
     gpio_reset_pin(LOAD3_PIN);
-    gpio_set_direction(LED4_GPIO, GPIO_MODE_OUTPUT);    // Set the GPIO as a push/pull output
+    gpio_set_direction(LOAD3_PIN, GPIO_MODE_OUTPUT);    // Set the GPIO as a push/pull output
     
     // Configure ZERO sensor pin for input
     gpio_reset_pin(ZERO_PIN);
-    gpio_set_direction(LED4_GPIO, GPIO_MODE_INPUT);    // Set the GPIO as input
+    gpio_set_direction(ZERO_PIN, GPIO_MODE_INPUT);    // Set the GPIO as input
 
     LED_OFF();
 
